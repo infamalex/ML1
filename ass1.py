@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import mean_squared_error
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -22,8 +21,10 @@ def read_data(file):
     
     df = pd.read_csv(file, names=range(2,33), usecols=label_select) #names start from 2 because 1st col automatically excluded
 
-    labels=["age","gender","education","country","ethnicity","nscore","escore",
-    "oscore","ascore","cscore","impulsive","ss","alcohol"]
+    labels= ["Trait"+str(i+1) for i in range(12)]+["alcohol"]
+    
+    #["age","gender","education","country","ethnicity","nscore","escore",
+    #"oscore","ascore","cscore","impulsive","ss","alcohol"]
     df.columns = labels
     return df
 
@@ -137,7 +138,7 @@ def split_countries(data,mapping,field):
         data.insert(1,title, np.isclose(data[field],m))
         data[title]=data[title].replace({False:0,True:1})
     data.drop(field,1)
-def main():
+def main(t=12):
 
     
     data = read_data("Practical1/data/drug_consumption.data")
@@ -166,10 +167,10 @@ def main():
     #split_countries(data,mapping,"education")
 
     y=data.alcohol
-    x = data.loc[:,"age":"ss"]
+    X = data.loc[:,"Trait1":"Trait"+str(t)]
     
     x_train, x_test, y_train, y_test = \
-    train_test_split(x, y, test_size=0.33, random_state=33)
+    train_test_split(X, y, test_size=0.33, random_state=12)
 
 
     
@@ -188,7 +189,11 @@ def main():
 
     
     
-    #pf = PolynomialFeatures(1,include_bias=False)
+    pf = PolynomialFeatures(3,include_bias=False)
+    
+    print(len(pf.fit_transform(X)[0] ))
+    print(len(X.columns))
+
     linreg = LinearRegression()
     #linreg.fit(x,y)
 #
@@ -196,23 +201,18 @@ def main():
     #print('MSE = ', mean_squared_error(y,y_hat))
 
     
-    
-
-    
     predictions = list()
     for i in range(1):
-        logreg = LogisticRegression(penalty='l2',C=.000000001)
-        yi =  y_train # ys[i]
+        logreg = LogisticRegression()
         
-        logreg.fit(x_train,yi)
+        logreg.fit(x_train,y_train)
 
         y_hat = logreg.predict(x_train)
         
         print('Accuracy = ', accuracy_score(y_train,y_hat,normalize=True))
-        y_hat = logreg.predict(x_test)
-        #predictions.append(logreg.predict_proba( x_test)[:,0])
+        #y_hat = logreg.predict(x_test)
 
-        print('Accuracy = ', accuracy_score(y_test,y_hat,normalize=True))
+        #print('Accuracy = ', accuracy_score(y_test,y_hat,normalize=True))
     #for i in range(len(y_test)):
     #predictions = np.stack(predictions,axis=1)
     #y_hat = ["CL"+str(max_index(pred)) for pred in predictions]
@@ -223,4 +223,5 @@ def main():
     
 
 if __name__ == "__main__":
-    main()
+    for i in range(1,13):
+        main(i)
