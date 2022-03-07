@@ -189,10 +189,10 @@ def main(t=12):
 
     
     
-    pf = PolynomialFeatures(3,include_bias=False)
+    pf = PolynomialFeatures(4,include_bias=True)
     
-    print(len(pf.fit_transform(X)[0] ))
-    print(len(X.columns))
+    print(len(pf.fit_transform(X.loc[:,"Trait1":"Trait12"])[0] ))
+    print(len(X.loc[:,"Trait1":"Trait12"].columns))
 
     linreg = LinearRegression()
     #linreg.fit(x,y)
@@ -223,5 +223,4 @@ def main(t=12):
     
 
 if __name__ == "__main__":
-    for i in range(1,13):
-        main(i)
+        main()

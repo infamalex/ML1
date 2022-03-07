@@ -1,14 +1,12 @@
-from itertools import count
-from os import replace
-from matplotlib import axis
+#!.venv/bin/python
+from cmath import e
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import mean_squared_error
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import Normalizer
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_score
 
@@ -36,11 +34,14 @@ def read_data(file,size,end_traits):
 """
 Train a logistic regression classifeir and 
 """
-def test(x_train,y_train,x_test,weight=None,penalty='none',C=1):
+def test(X,Y,x_del,weight=None,penalty='none',C=1):
+    x_train, x_valid, y_train, y_valid = \
+    train_test_split(X, Y, test_size=0.25, random_state=45)
+
     logreg = LogisticRegression(class_weight=weight,penalty=penalty,C=C)
     logreg.fit(x_train,y_train)
-    y_hat = logreg.predict(x_test)
-    return (y_hat, logreg)
+    y_pred = logreg.predict(x_valid)
+    return (y_pred, y_valid, logreg)
 
 def get_rates(matrix):
     
@@ -56,13 +57,20 @@ def get_rates(matrix):
         counts[l]["fp"]=sum(actual_class)-counts[l]["tp"]#counts for actual class minus tp
     return counts
         
+"""Calculate the Precission and Recall of a """
 def p_and_r(rates):
+    print(YEL+"Precission and Recall")
     for l in rates:
-        print(l,"Precision=",rates[l]["tp"]/(rates[l]["tp"]+rates[l]["fp"]))
+        print(BLUE,l,"Precision ="+RED,rates[l]["tp"]/(rates[l]["tp"]+rates[l]["fp"]))
+    print(ENDC,end="")
 
-def accuracy():
-    pass    
+def accuracy(counts,total):
+    return sum([counts[i]["tp"] for i in counts])/total   
 
+"""
+returns a dictionary containing the confusion matrix for predicted data.
+Each entry in the dictionary contains the label
+"""
 def confusion_matrix(y_pred, y_true):
     labels=list(set(y_true)) #extract the classes from the data
     labels.sort()
@@ -70,9 +78,10 @@ def confusion_matrix(y_pred, y_true):
     y_true=list(y_true)
 
     matrix = dict()
-    for l in labels:
-        matrix[l]=[0]*len(labels)
+    for l in labels: #initialising the matrix with an array
+        matrix[l]=[0]*len(labels) 
     for i in range(len(y_pred)):
+    
         row = y_pred[i]
         col = labels.index(y_true[i])
         matrix[row][col]+=1
@@ -119,42 +128,48 @@ def main():
     Y=data.Class17
     X = data.loc[:,"Trait1":"Trait12"]
     
+    #split train and test data
     x_train, x_test, y_train, y_test = \
-    train_test_split(X, Y, test_size=0.33, random_state=69)
+    train_test_split(X, Y, test_size=0.25, random_state=69)
 
-    scale = StandardScaler() #scale train and test data separately
+    #Scale the data
+    scale = Normalizer() #scale train and test data separately
     x_train = scale.fit_transform(x_train,None)
     x_test = scale.fit_transform(x_test,None)
 
-    y_pred = test(x_train,y_train,x_test)[0]
+    y_pred, y_true= test(x_train,y_train,x_test)[0:2]
 
     print('Basic Test:')
-    print('Accuracy =', accuracy_score(y_test,y_pred))
+    print('Accuracy =', accuracy_score(y_true,y_pred))
 
-    y_pred = test(x_train,y_train,x_test, weight="balanced")[0]
-    print('Balanced Test:')
-    print('Accuracy =', accuracy_score(y_test,y_pred))
+    y_pred, y_true = test(x_train,y_train,x_test, weight="balanced")[0:2]
+    print(YEL+'Balanced Test:')
+    print(BLUE,'Accuracy ='+RED, accuracy_score(y_true,y_pred),ENDC)
 
     
-    m=confusion_matrix(y_pred,y_test)
+    m=confusion_matrix(y_pred,y_true)
     counts = get_rates(m)
     p_and_r(counts)
-    print(precision_score(y_test,y_pred,average=None))
+    print(precision_score(y_true,y_pred,average=None))
     print(sum([counts[i]["tp"] for i in counts])/len(y_pred))
 
     #print confusion matrix
     print_matrix(m)
-    print(confusion_matrix(y_test,y_pred))
+    print(confusion_matrix(y_true,y_pred))
 
-    y_pred = test(x_train,y_train,x_train)[0]
+    y_pred, y_true = test(x_train,y_train,x_train)[0:2]
     print(YEL+'Train Test:')
 
-    m=confusion_matrix(y_pred,y_train)
+    #Accuracy of the 
+    m=confusion_matrix(y_pred,y_true)
     counts = get_rates(m)
-    print(BLUE,'Accuracy ='+RED, \
-        sum([counts[i]["tp"] for i in counts])/len(y_pred),ENDC)
-
+    print(BLUE,'Accuracy ='+RED,accuracy(counts,len(y_pred)) ,ENDC)
+    
     
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(ENDC)
+        raise e
