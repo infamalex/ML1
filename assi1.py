@@ -9,6 +9,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import Normalizer
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import balanced_accuracy_score
 
 #ansi color codes
 BLUE='\033[94m'
@@ -16,6 +18,7 @@ RED='\033[91m'
 ENDC = '\033[0m'
 UNDERLINE = '\033[4m'
 YEL='\033[93m'
+PURP='\033[95m'
 
 """
 Read in data from specified file and return and formats the relevent parts
@@ -34,38 +37,48 @@ def read_data(file,size,end_traits):
 """
 Train a logistic regression classifeir and 
 """
-def test(X,Y,x_del,weight=None,penalty='none',C=1):
-    x_train, x_valid, y_train, y_valid = \
-    train_test_split(X, Y, test_size=0.25, random_state=45)
+def test(X,Y,x_test=None,y_test=None,weight=None,penalty='none',C=1):
+    if type(x_test) == type(None): #split into separate validation set if test set isn't provided
+        x_train, x_valid, y_train, y_valid = \
+        train_test_split(X, Y, test_size=0.25, random_state=45)
+    else: #validate on whole training set
+        x_train = X
+        x_valid = x_test
+        y_train = Y
+        y_valid = y_test
 
     logreg = LogisticRegression(class_weight=weight,penalty=penalty,C=C)
     logreg.fit(x_train,y_train)
     y_pred = logreg.predict(x_valid)
     return (y_pred, y_valid, logreg)
 
-def get_rates(matrix):
-    
+"""
+Calculate and print the precission and recall of a confusion matrix
+"""
+def p_and_r2(matrix):
     labels=list(matrix.keys())
-    labels.sort()  
-    counts = dict()
-    for l in labels:
-        counts[l]={"tp":0,"fp":0,"fn":0}
-    for l in labels:
-        counts[l]["tp"]=matrix[l][labels.index(l)]
-        counts[l]["fp"]=sum(matrix[l])-counts[l]["tp"]#positves minues tp
-        actual_class=[ matrix[l][labels.index(r)] for r in labels] #get column for actual class
-        counts[l]["fp"]=sum(actual_class)-counts[l]["tp"]#counts for actual class minus tp
-    return counts
-        
-"""Calculate the Precission and Recall of a """
-def p_and_r(rates):
     print(YEL+"Precission and Recall")
-    for l in rates:
-        print(BLUE,l,"Precision ="+RED,rates[l]["tp"]/(rates[l]["tp"]+rates[l]["fp"]))
-    print(ENDC,end="")
+    for l in matrix:
+        tp=matrix[l][labels.index(l)]
+        fp = sum(matrix[l])-tp#positves minues tp
+        actual_class=[ matrix[r][labels.index(l)] for r in labels] #get column for actual class
+        fn = sum(actual_class)-tp#counts for actual class minus tp
 
-def accuracy(counts,total):
-    return sum([counts[i]["tp"] for i in counts])/total   
+        prec = tp/(tp+fp) if tp+fp>0 else 0 #if denominator is 0, print 0
+        rec = tp/(tp+fn) if tp+fn>0 else 0 #using a validation set can cause problems with too little data
+
+        print(BLUE,l,"| Precision ="+RED,"{0:.5f}".format(prec) , end="")
+        print(BLUE,"Recall ="+RED,"{0:.5f}".format(rec))
+        
+
+"""
+Calculates the accuracy score for a given confusion matrix.
+Divides the TP by the total number of data points.
+"""
+def accuracy(matrix):
+    labels=list(matrix.keys())
+    total = sum([sum(matrix[l]) for l in labels])
+    return sum([matrix[l][labels.index(l)] for l in labels])/total   
 
 """
 returns a dictionary containing the confusion matrix for predicted data.
@@ -108,6 +121,17 @@ def print_matrix(matrix):
             print(RED+"{:>6}".format(r),end="")
         print(ENDC)
 
+def micro_and_macro(y_true,y_pred):
+       #micro and macro averages
+    print(BLUE,"Macro Precision ="+RED,"{0:.5f}".format(\
+        precision_score(y_true,y_pred,average='macro',zero_division=0)) , end="")
+    print(BLUE,"Micro Precision ="+RED,"{0:.5f}".format(\
+        precision_score(y_true,y_pred,average='micro',zero_division=0)))
+    print(BLUE,"Macro Recall ="+RED,"{0:.5f}".format(\
+        recall_score(y_true,y_pred,average='macro',zero_division=0)) , end="")
+    print(BLUE,"Micro Recall ="+RED,"{0:.5f}".format(\
+        recall_score(y_true,y_pred,average='micro',zero_division=0)))
+
 """
 Maps an existing collumn into a dummy variable
 mapping:A dictionary 
@@ -133,37 +157,55 @@ def main():
     train_test_split(X, Y, test_size=0.25, random_state=69)
 
     #Scale the data
-    scale = Normalizer() #scale train and test data separately
+    scale = StandardScaler() #scale train and test data separately
     x_train = scale.fit_transform(x_train,None)
     x_test = scale.fit_transform(x_test,None)
 
-    y_pred, y_true= test(x_train,y_train,x_test)[0:2]
+    #First test
+    y_pred, y_true= test(x_train,y_train,x_test,y_test)[0:2]
 
-    print('Basic Test:')
-    print('Accuracy =', accuracy_score(y_true,y_pred))
+    print(PURP+'Unbalanced Test:')
+    print(BLUE,'Accuracy ='+RED, accuracy_score(y_true,y_pred),ENDC)
 
-    y_pred, y_true = test(x_train,y_train,x_test, weight="balanced")[0:2]
-    print(YEL+'Balanced Test:')
+    m=confusion_matrix(y_pred,y_true)
+
+    #print confusion matrix
+    print_matrix(m)
+
+    p_and_r2(m)
+    
+    micro_and_macro(y_true,y_pred)
+ 
+
+    #Second Test
+    y_pred, y_true = test(x_train,y_train,x_test,y_test, weight="balanced")[0:2]
+    print(PURP+'Balanced Test:')
     print(BLUE,'Accuracy ='+RED, accuracy_score(y_true,y_pred),ENDC)
 
     
     m=confusion_matrix(y_pred,y_true)
-    counts = get_rates(m)
-    p_and_r(counts)
-    print(precision_score(y_true,y_pred,average=None))
-    print(sum([counts[i]["tp"] for i in counts])/len(y_pred))
 
     #print confusion matrix
     print_matrix(m)
-    print(confusion_matrix(y_true,y_pred))
+    p_and_r2(m)
 
-    y_pred, y_true = test(x_train,y_train,x_train)[0:2]
-    print(YEL+'Train Test:')
+    #micro and macro averages
+    print(BLUE,"Macro Precision ="+RED,"{0:.5f}".format(\
+        precision_score(y_true,y_pred,average='macro')) , end="")
+    print(BLUE,"Micro Precision ="+RED,"{0:.5f}".format(\
+        precision_score(y_true,y_pred,average='micro')))
+    print(BLUE,"Macro Recall ="+RED,"{0:.5f}".format(\
+        recall_score(y_true,y_pred,average='macro')) , end="")
+    print(BLUE,"Micro Recall ="+RED,"{0:.5f}".format(\
+        recall_score(y_true,y_pred,average='micro')))
+
+    #Third test
+    y_pred, y_true = test(x_train,y_train,x_test,y_test,penalty="l2")[0:2]
+    print(PURP+'Train Test:')
 
     #Accuracy of the 
     m=confusion_matrix(y_pred,y_true)
-    counts = get_rates(m)
-    print(BLUE,'Accuracy ='+RED,accuracy(counts,len(y_pred)) ,ENDC)
+    print(BLUE,'Accuracy ='+RED,accuracy(m) ,ENDC)
     
     
 
